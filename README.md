@@ -1,6 +1,3 @@
-Here is a comprehensive `README.md` file tailored for your specific backend code. It explains the features, setup, and API endpoints clearly.
-
-````markdown
 # Legal AI Backend ⚖️
 
 A high-performance FastAPI backend designed to analyze legal contracts, detect risks, and rewrite clauses using **Google Gemini 2.5 Flash**. This system features a robust **3-Layer PDF Extraction** engine to handle standard and scanned documents efficiently while optimizing API costs.
@@ -117,6 +114,3 @@ The system protects your API quota using this logic:
 ## 📝 License
 
 This project is open-source and available under the MIT License.
-
-```
-```
