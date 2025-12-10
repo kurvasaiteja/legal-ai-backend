@@ -9,7 +9,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pdfplumber
-from pypdf import PdfReader  # Free Fallback
+from pypdf import PdfReader  
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -17,7 +17,6 @@ load_dotenv()
 
 app = FastAPI()
 
-# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,13 +25,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- GEMINI SETUP ---
+
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel('models/gemini-2.5-flash')
 
 SESSIONS: Dict[str, Dict[str, Any]] = {}
 
-# --- MODELS ---
+
 class AnalyzeRequest(BaseModel):
     session_id: str
 
@@ -43,7 +42,7 @@ class ChatRequest(BaseModel):
 class RewriteRequest(BaseModel):
     clause_text: str
 
-# --- UTILS ---
+
 
 def clean_text(text: str) -> str:
     """Removes asterisks, bolding, and extra whitespace."""
@@ -63,7 +62,7 @@ def ocr_via_gemini(file_path: str, mime_type="application/pdf") -> str:
             uploaded_file = genai.get_file(uploaded_file.name)
 
         prompt = "Transcribe the full text from this document exactly as it appears. Output raw text only."
-        response = model.generate_content([uploaded_file, prompt])
+        response = model.generate_content([uploaded_file, prompt], generation_config={"temperature": 0.0})
         
         return response.text
     except Exception as e:
@@ -79,7 +78,7 @@ def extract_text_from_pdf(file_path: str) -> str:
     """
     full_text = ""
     
-    # --- LAYER 1: pdfplumber ---
+   
     print("Trying Layer 1: pdfplumber...")
     try:
         with pdfplumber.open(file_path) as pdf:
@@ -95,12 +94,12 @@ def extract_text_from_pdf(file_path: str) -> str:
     except Exception as e:
         print(f"Layer 1 crash: {e}")
 
-    # Verification
+   
     if len(full_text.strip()) > 50:
         print("✅ Layer 1 Success. Using local PDF text.")
         return full_text
 
-    # --- LAYER 2: pypdf ---
+  
     print("Layer 1 yielded no text. Trying Layer 2: pypdf...")
     full_text = "" 
     try:
@@ -119,9 +118,11 @@ def extract_text_from_pdf(file_path: str) -> str:
         print("✅ Layer 2 Success.")
         return full_text
 
-    # --- LAYER 3: Gemini OCR ---
+
     print("❌ Layers 1 & 2 failed (Scanned Document). Using Layer 3: Gemini OCR.")
     return ocr_via_gemini(file_path)
+
+
 
 @app.get("/")
 def home():
@@ -136,7 +137,7 @@ def upload_contract(file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # This logic now protects your API Key
+    
     contract_text = extract_text_from_pdf(file_path)
 
     if not contract_text or len(contract_text) < 10:
@@ -181,7 +182,8 @@ def analyze_risks(request: AnalyzeRequest):
     """
 
     try:
-        response = model.generate_content(prompt)
+        
+        response = model.generate_content(prompt, generation_config={"temperature": 0.0})
         text_out = response.text.strip().replace("```json", "").replace("```", "")
         text_out = clean_text(text_out)
         return {"risks": text_out}
@@ -206,7 +208,8 @@ def chat(request: ChatRequest):
     
     full_prompt = f"{context}\n\nUser Question: {request.query}"
     
-    response = model.generate_content(full_prompt)
+   
+    response = model.generate_content(full_prompt, generation_config={"temperature": 0.0})
     clean_response = clean_text(response.text)
     
     session['chat_history'].append({"role": "user", "content": request.query})
@@ -229,7 +232,7 @@ def rewrite_clause(request: RewriteRequest):
     """
     
     try:
-        response = model.generate_content(prompt)
+        response = model.generate_content(prompt, generation_config={"temperature": 0.0})
         cleaned = clean_text(response.text)
         return {"rewritten": cleaned}
     except Exception:
